@@ -24,11 +24,11 @@ jobs:
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.h || true
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.cpp || true
 
-          # Готуємо папку та заглушку datacopy.cpp, щоб оминути помилки Clang/unions
+          # Створюємо заглушку datacopy.cpp із правильними інклудами
           mkdir -p build/arm-none-eabi/radio/src/
           cat << 'EOF' > build/arm-none-eabi/radio/src/datacopy.cpp
-          #include "storage/datacopy.h"
-          #include "storage/radio_data.h"
+          #include "datacopy.h"
+          #include "radio_data.h"
 
           void copyData(RadioData * dest, RadioData * src)
           {
