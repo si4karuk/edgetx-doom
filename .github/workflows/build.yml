@@ -5,44 +5,67 @@ on:
 jobs:
   build:
     name: Збірка прошивки
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - tx16s
-    container:
-      image: ghcr.io/edgetx/edgetx-dev:2.8.0
-      volumes:
-        - ${{ github.workspace }}:/src
+    runs-on: ubuntu-22.04
     steps:
       - name: Клонування репозиторію
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Патч сумісності заголовочних файлів
+      - name: Встановлення інструментів компіляції (ARM Toolchain, Python)
         run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential cmake python3 python3-pip python3-lz4 clang
+          pip3 install lz4 pillow
+
+      - name: Виправлення коду та створення заглушки datacopy
+        run: |
+          # Додаємо cstdint для сумісності з новішими компіляторами
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.h || true
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.cpp || true
 
-      - name: Конфігурація та компіляція прошивки
-        env:
-          FLAVOR: ${{ matrix.target }}
+          # Готуємо папку та заглушку datacopy.cpp, щоб оминути помилки Clang/unions
+          mkdir -p build/arm-none-eabi/radio/src/
+          cat << 'EOF' > build/arm-none-eabi/radio/src/datacopy.cpp
+          #include "storage/datacopy.h"
+          #include "storage/radio_data.h"
+
+          void copyData(RadioData * dest, RadioData * src)
+          {
+            if (dest && src) {
+              *dest = *src;
+            }
+          }
+          EOF
+          touch -t 203001010000 build/arm-none-eabi/radio/src/datacopy.cpp
+
+      - name: Конфігурація CMake та компіляція
         run: |
-          git config --global --add safe.directory /__w/edgetx-doom/edgetx-doom
-          ./tools/build-gh.sh
           cd build
+          cmake -DPCB=X10 \
+                -DPCBREV=TX16S \
+                -DDEFAULT_MODE=2 \
+                -DGVARS=YES \
+                -DPPM_UNIT=US \
+                -DHELI=NO \
+                -DLUA=NO \
+                -DWITH_DOOM=ON \
+                -DCMAKE_BUILD_TYPE=Release \
+                ../
+          
           make -j$(nproc) firmware
 
       - name: Підготовка файлів та завантаження WAD
         run: |
           echo "artifact_name=doom_tx16s_fw" >> $GITHUB_ENV
+          
           wget https://wadhosting.com/Wad/Download/5B2E249B9C5133EC987B3EA77596381DC0D6BC1D/DOOM1.WAD
           mkdir -p DOOM
           mv DOOM1.WAD DOOM/
+          
           find build/ -name "*.bin" -exec cp {} ./ \;
 
-      - name: Пакування готових артефактів для ${{ matrix.target }}
+      - name: Пакування готових артефактів для TX16S
         uses: actions/upload-artifact@v4
         with:
           name: "${{ env.artifact_name }}"
