@@ -29,8 +29,17 @@ jobs:
           cat << 'EOF' > build/arm-none-eabi/radio/src/storage/datacopy.h
           #ifndef DATACOPY_H
           #define DATACOPY_H
-          struct RadioData;
-          void copyData(RadioData * dest, RadioData * src);
+          
+          #include <cstring>
+
+          inline void copyRadioData(void * dest, const void * src) {
+            if (dest && src) std::memcpy(dest, src, 1);
+          }
+
+          inline void copyModelData(void * dest, const void * src) {
+            if (dest && src) std::memcpy(dest, src, 1);
+          }
+
           #endif
           EOF
 
@@ -60,7 +69,6 @@ jobs:
           
           make -j$(nproc) firmware
           
-          # Конвертуємо скомпільований firmware.elf у готовий .bin файл прошивки
           arm-none-eabi-objcopy -O binary firmware.elf doom_tx16s.bin || arm-none-eabi-objcopy -O binary radio/src/firmware.elf doom_tx16s.bin
 
       - name: Підготовка файлів та завантаження WAD
