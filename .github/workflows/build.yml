@@ -20,23 +20,27 @@ jobs:
 
       - name: Виправлення коду та створення заглушки datacopy
         run: |
-          # Додаємо cstdint для сумісності з C++11/14
+          # Додаємо cstdint для сумісності з новішими компіляторами
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.h || true
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.cpp || true
 
-          # Створюємо потрібну структуру папок та реалізацію datacopy.cpp
+          # Створюємо директорії для заглушок
           mkdir -p build/arm-none-eabi/radio/src/storage/
-          
-          # Заглушка заголовочного файлу
+          mkdir -p build/arm-none-eabi/radio/src/
+
+          # Заглушка datacopy.h
           cat << 'EOF' > build/arm-none-eabi/radio/src/storage/datacopy.h
           #ifndef DATACOPY_H
           #define DATACOPY_H
-          #include "radio_data.h"
+          #include "storage/radio_data.h"
           void copyData(RadioData * dest, RadioData * src);
           #endif
           EOF
 
-          # Заглушка сирцевого файлу
+          # Скопіюємо header і в корінь src для надійності
+          cp build/arm-none-eabi/radio/src/storage/datacopy.h build/arm-none-eabi/radio/src/datacopy.h
+
+          # Заглушка datacopy.cpp
           cat << 'EOF' > build/arm-none-eabi/radio/src/datacopy.cpp
           #include "storage/datacopy.h"
           #include "storage/radio_data.h"
@@ -48,9 +52,10 @@ jobs:
             }
           }
           EOF
-          
-          # Захист від перезапису скриптом
+
+          # Фіксуємо дату файлів у майбутньому, щоб Make їх не перезаписував
           touch -t 203001010000 build/arm-none-eabi/radio/src/storage/datacopy.h
+          touch -t 203001010000 build/arm-none-eabi/radio/src/datacopy.h
           touch -t 203001010000 build/arm-none-eabi/radio/src/datacopy.cpp
 
       - name: Конфігурація CMake та компіляція
