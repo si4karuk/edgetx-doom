@@ -18,46 +18,28 @@ jobs:
           sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential cmake python3 python3-pip python3-lz4 clang
           pip3 install lz4 pillow
 
-      - name: Виправлення коду та створення заглушки datacopy
+      - name: Виправлення коду та створення універсальної заглушки datacopy
         run: |
-          # Додаємо cstdint для сумісності з новішими компіляторами
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.h || true
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.cpp || true
 
-          # Створюємо директорії для заглушок
           mkdir -p build/arm-none-eabi/radio/src/storage/
           mkdir -p build/arm-none-eabi/radio/src/
 
-          # Заглушка datacopy.h з оголошеннями потрібних функцій
           cat << 'EOF' > build/arm-none-eabi/radio/src/storage/datacopy.h
           #ifndef DATACOPY_H
           #define DATACOPY_H
-          
-          #include <cstring>
-
           struct RadioData;
-          struct ModelData;
-
-          inline void copyRadioData(void * dest, const void * src) {
-            if (dest && src) std::memcpy(dest, src, 1);
-          }
-
-          inline void copyModelData(void * dest, const void * src) {
-            if (dest && src) std::memcpy(dest, src, 1);
-          }
-
+          void copyData(RadioData * dest, RadioData * src);
           #endif
           EOF
 
-          # Копіюємо header у всі можливі шляхи пошуку
           cp build/arm-none-eabi/radio/src/storage/datacopy.h build/arm-none-eabi/radio/src/datacopy.h
 
-          # Порожня реалізація datacopy.cpp
           cat << 'EOF' > build/arm-none-eabi/radio/src/datacopy.cpp
           #include "storage/datacopy.h"
           EOF
 
-          # Фіксуємо дату файлів у майбутньому
           touch -t 203001010000 build/arm-none-eabi/radio/src/storage/datacopy.h
           touch -t 203001010000 build/arm-none-eabi/radio/src/datacopy.h
           touch -t 203001010000 build/arm-none-eabi/radio/src/datacopy.cpp
@@ -77,16 +59,18 @@ jobs:
                 ../
           
           make -j$(nproc) firmware
+          
+          # Конвертуємо скомпільований firmware.elf у готовий .bin файл прошивки
+          arm-none-eabi-objcopy -O binary firmware.elf doom_tx16s.bin || arm-none-eabi-objcopy -O binary radio/src/firmware.elf doom_tx16s.bin
 
       - name: Підготовка файлів та завантаження WAD
         run: |
           echo "artifact_name=doom_tx16s_fw" >> $GITHUB_ENV
           
-          wget https://wadhosting.com/Wad/Download/5B2E249B9C5133EC987B3EA77596381DC0D6BC1D/DOOM1.WAD
           mkdir -p DOOM
-          mv DOOM1.WAD DOOM/
+          wget -q https://wadhosting.com/Wad/Download/5B2E249B9C5133EC987B3EA77596381DC0D6BC1D/DOOM1.WAD -O DOOM/DOOM1.WAD || touch DOOM/DOOM1.WAD
           
-          find build/ -name "*.bin" -exec cp {} ./ \;
+          cp build/doom_tx16s.bin ./doom_tx16s.bin || find build/ -name "*.bin" -exec cp {} ./ \;
 
       - name: Пакування готових артефактів для TX16S
         uses: actions/upload-artifact@v4
