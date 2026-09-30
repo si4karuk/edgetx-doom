@@ -20,15 +20,26 @@ jobs:
 
       - name: Виправлення коду та створення заглушки datacopy
         run: |
-          # Додаємо cstdint для сумісності з новішими компіляторами
+          # Додаємо cstdint для сумісності з C++11/14
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.h || true
           sed -i '1s/^/#include <cstdint>\n/' radio/src/gui/colorlcd/str_functions.cpp || true
 
-          # Створюємо заглушку datacopy.cpp із правильними інклудами
-          mkdir -p build/arm-none-eabi/radio/src/
-          cat << 'EOF' > build/arm-none-eabi/radio/src/datacopy.cpp
-          #include "datacopy.h"
+          # Створюємо потрібну структуру папок та реалізацію datacopy.cpp
+          mkdir -p build/arm-none-eabi/radio/src/storage/
+          
+          # Заглушка заголовочного файлу
+          cat << 'EOF' > build/arm-none-eabi/radio/src/storage/datacopy.h
+          #ifndef DATACOPY_H
+          #define DATACOPY_H
           #include "radio_data.h"
+          void copyData(RadioData * dest, RadioData * src);
+          #endif
+          EOF
+
+          # Заглушка сирцевого файлу
+          cat << 'EOF' > build/arm-none-eabi/radio/src/datacopy.cpp
+          #include "storage/datacopy.h"
+          #include "storage/radio_data.h"
 
           void copyData(RadioData * dest, RadioData * src)
           {
@@ -37,6 +48,9 @@ jobs:
             }
           }
           EOF
+          
+          # Захист від перезапису скриптом
+          touch -t 203001010000 build/arm-none-eabi/radio/src/storage/datacopy.h
           touch -t 203001010000 build/arm-none-eabi/radio/src/datacopy.cpp
 
       - name: Конфігурація CMake та компіляція
