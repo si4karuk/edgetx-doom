@@ -30,22 +30,16 @@ jobs:
           FLAVOR: ${{ matrix.target }}
         run: |
           git config --global --add safe.directory /__w/edgetx-doom/edgetx-doom
-          
-          # Запуск офіційного скрипта конфігурації EdgeTX
           ./tools/build-gh.sh
-          
-          # Запуск компіляції
           cd build
           make -j$(nproc) firmware
 
       - name: Підготовка файлів та завантаження WAD
         run: |
           echo "artifact_name=doom_tx16s_fw" >> $GITHUB_ENV
-          
           wget https://wadhosting.com/Wad/Download/5B2E249B9C5133EC987B3EA77596381DC0D6BC1D/DOOM1.WAD
           mkdir -p DOOM
           mv DOOM1.WAD DOOM/
-          
           find build/ -name "*.bin" -exec cp {} ./ \;
 
       - name: Пакування готових артефактів для ${{ matrix.target }}
